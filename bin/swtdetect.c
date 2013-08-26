@@ -2,12 +2,8 @@
 #include <sys/time.h>
 #include <ctype.h>
 
-unsigned int get_current_time()
-{
-	struct timeval tv;
-	gettimeofday(&tv, 0);
-	return tv.tv_sec * 1000 + tv.tv_usec / 1000;
-}
+
+
 
 int main(int argc, char** argv)
 {
@@ -17,21 +13,43 @@ int main(int argc, char** argv)
 	if (image != 0)
 	{
 		unsigned int elapsed_time = get_current_time();
-		ccv_array_t* words = ccv_swt_detect_words(image, ccv_swt_default_params);
+		ccv_array_t* textlines = ccv_swt_detect_textlines2(image, ccv_swt_default_params);
 		elapsed_time = get_current_time() - elapsed_time;
-		if (words)
+		if (textlines)
 		{
 			int i;
-			for (i = 0; i < words->rnum; i++)
+			for (i = 0; i < textlines->rnum; i++)
 			{
-				ccv_rect_t* rect = (ccv_rect_t*)ccv_array_get(words, i);
-				printf("%d %d %d %d\n", rect->x, rect->y, rect->width, rect->height);
+				//ccv_rect_t* rect = (ccv_rect_t*)ccv_array_get(textlines, i);
+				//printf("%d %d %d %d\n", rect->x, rect->y, rect->width, rect->height);
+
+                ccv_textline_t *line = (ccv_textline_t*)ccv_array_get(textlines, i);
+                printf("%d %d %d %d\n", 
+                    line->rect.x,
+                    line->rect.y,
+                    line->rect.width,
+                    line->rect.height
+                    );
+
+                for (int j=0; j<line->neighbors; j++) {
+                    ccv_letter_t *letter = (ccv_letter_t*) ccv_array_get((ccv_array_t*)line->letters, j);
+
+                    printf("%d %d %d %d\n", 
+                        letter->rect.x,
+                        letter->rect.y,
+                        letter->rect.width,
+                        letter->rect.height
+                        );
+
+                    fflush(stdout);
+                }
+                
 			}
-			printf("total : %d in time %dms\n", words->rnum, elapsed_time);
-			ccv_array_free(words);
+			printf("total : %d in time %dms\n", textlines->rnum, elapsed_time);
+			ccv_swt_free_textlines2(textlines);
 		}
 		ccv_matrix_free(image);
-	} else {
+	} /*else {
 		FILE* r = fopen(argv[1], "rt");
 		if (argc == 3)
 			chdir(argv[2]);
@@ -48,20 +66,21 @@ int main(int argc, char** argv)
 				image = 0;
 				printf("%s\n", file);
 				ccv_read(file, &image, CCV_IO_GRAY | CCV_IO_ANY_FILE);
-				ccv_array_t* words = ccv_swt_detect_words(image, ccv_swt_default_params);
+				ccv_array_t* textlines = ccv_swt_detect_textlines(image, ccv_swt_default_params);
 				int i;
-				for (i = 0; i < words->rnum; i++)
+				for (i = 0; i < textlines->rnum; i++)
 				{
-					ccv_rect_t* rect = (ccv_rect_t*)ccv_array_get(words, i);
+					ccv_rect_t* rect = (ccv_rect_t*)ccv_array_get(textlines, i);
 					printf("%d %d %d %d\n", rect->x, rect->y, rect->width, rect->height);
 				}
-				ccv_array_free(words);
+				ccv_array_free(textlines);
 				ccv_matrix_free(image);
 			}
 			free(file);
 			fclose(r);
 		}
 	}
+    */
 	ccv_drain_cache();
 	return 0;
 }
