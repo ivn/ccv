@@ -2,6 +2,12 @@
 #include <sys/time.h>
 #include <ctype.h>
 
+unsigned int get_current_time()
+{
+    struct timeval tv;
+    gettimeofday(&tv, 0);
+    return tv.tv_sec * 1000 + tv.tv_usec / 1000;
+}
 
 
 
@@ -34,7 +40,7 @@ int main(int argc, char** argv)
                 for (int j=0; j<line->neighbors; j++) {
                     ccv_letter_t *letter = (ccv_letter_t*) ccv_array_get((ccv_array_t*)line->letters, j);
 
-                    printf("%d %d %d %d\n", 
+                    printf("\t%d %d %d %d\n", 
                         letter->rect.x,
                         letter->rect.y,
                         letter->rect.width,
