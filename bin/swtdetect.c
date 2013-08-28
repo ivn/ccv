@@ -2,18 +2,13 @@
 #include <sys/time.h>
 #include <ctype.h>
 
-unsigned int get_current_time()
-{
-    struct timeval tv;
-    gettimeofday(&tv, 0);
-    return tv.tv_sec * 1000 + tv.tv_usec / 1000;
-}
 
 
 
 int main(int argc, char** argv)
 {
-	ccv_enable_default_cache();
+	ccv_enable_cache(1024*1024*1024);
+	//ccv_enable_default_cache();
 	ccv_dense_matrix_t* image = 0;
 	ccv_read(argv[1], &image, CCV_IO_GRAY | CCV_IO_ANY_FILE);
 	if (image != 0)

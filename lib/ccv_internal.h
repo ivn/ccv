@@ -12,7 +12,6 @@ static int _CCV_PRINT_LOOP __attribute__ ((unused)) = 0;
 /* simple utility functions */
 
 #define ccv_descale(x, n) (((x) + (1 << ((n) - 1))) >> (n))
-#define conditional_assert(x, expr) if ((x)) { assert(expr); }
 
 /* macro printf utilities */
 
@@ -133,6 +132,7 @@ static int _CCV_PRINT_LOOP __attribute__ ((unused)) = 0;
 #define ccv_function_state_finish() }
 
 /* the factor used to provide higher accuracy in integer type (all integer computation in some cases) */
+#define _ccv_get_16s_value(ptr, i, factor) (((short*)(ptr))[(i)] << factor)
 #define _ccv_get_32s_value(ptr, i, factor) (((int*)(ptr))[(i)] << factor)
 #define _ccv_get_32f_value(ptr, i, factor) ((float*)(ptr))[(i)]
 #define _ccv_get_64s_value(ptr, i, factor) (((int64_t*)(ptr))[(i)] << factor)
@@ -140,6 +140,7 @@ static int _CCV_PRINT_LOOP __attribute__ ((unused)) = 0;
 #define _ccv_get_8u_value(ptr, i, factor) (((unsigned char*)(ptr))[(i)] << factor)
 
 #define ccv_matrix_getter(type, block, ...) { switch (CCV_GET_DATA_TYPE(type)) { \
+	case CCV_16S: { block(__VA_ARGS__, _ccv_get_16s_value); break; } \
 	case CCV_32S: { block(__VA_ARGS__, _ccv_get_32s_value); break; } \
 	case CCV_32F: { block(__VA_ARGS__, _ccv_get_32f_value); break; } \
 	case CCV_64S: { block(__VA_ARGS__, _ccv_get_64s_value); break; } \

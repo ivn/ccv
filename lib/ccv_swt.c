@@ -5,15 +5,19 @@
 #include <sys/time.h>
 #include <ctype.h>
 
+#define MAX_RAY_LENGTH 70
+
+#include "ipp.h"
+
 const ccv_swt_param_t ccv_swt_default_params = {
 	.interval = 1,
 	.same_word_thresh = { 0.1, 0.8 },
 	.min_neighbors = 3, //1 original
 	.scale_invariant = 0,
-	.size = 3,
-	.low_thresh = 124,
+	.size = 3, // 3 original
+	.low_thresh = 50, //124,
 	.high_thresh = 204,
-	.max_height = 300,
+	.max_height = 100, // 300 original
 	.min_height = 8,
 	.min_area = 38,
 	.letter_occlude_thresh = 3,
@@ -38,9 +42,74 @@ typedef struct {
 } ccv_swt_stroke_t;
 
 
+
+
 #define less_than(s1, s2, aux) ((s1).w < (s2).w)
 static CCV_IMPLEMENT_QSORT(_ccv_swt_stroke_qsort, ccv_swt_stroke_t, less_than)
 #undef less_than
+
+// hardcoded 3x3 mask
+void ipp_sobel(ccv_dense_matrix_t* a, ccv_dense_matrix_t** b, int type, int dx, int dy)
+{
+	assert(CCV_GET_CHANNEL(a->type) == CCV_C1);
+	ccv_declare_derived_signature(sig, a->sig != 0, ccv_sign_with_format(64, "ipp_sobel(%d,%d)", dx, dy), a->sig, CCV_EOF_SIGN);
+	type = (type == 0) ? CCV_32S | CCV_GET_CHANNEL(a->type) : CCV_GET_DATA_TYPE(type) | CCV_GET_CHANNEL(a->type);
+	ccv_dense_matrix_t* db = *b = ccv_dense_matrix_renew(*b, a->rows, a->cols, CCV_GET_CHANNEL(a->type) | CCV_ALL_DATA_TYPE, type, sig);
+	ccv_object_return_if_cached(, db);
+
+    int size, size1, dx_step, dy_step;
+    int width = a->cols;
+    int height = a->rows;
+    IppiSize roi = {width,height};
+    IppStatus sts;
+
+    dx_step = dy_step = 2*width;
+    db->step = dx_step;
+
+    sts = ippiFilterSobelNegVertGetBufferSize_8u16s_C1R(roi, ippMskSize3x3, &size);
+    sts = ippiFilterSobelHorizGetBufferSize_8u16s_C1R(roi, ippMskSize3x3, &size1); 
+    if (size1 > size) size = size1;
+    Ipp8u* buffer = (Ipp8u*) malloc(size);
+
+    if (dx) {
+        sts = ippiFilterSobelNegVertBorder_8u16s_C1R (a->data.u8, a->step, db->data.s16, dx_step, roi, ippMskSize3x3, ippBorderRepl, 0, buffer);
+    } else if (dy) {
+        sts = ippiFilterSobelHorizBorder_8u16s_C1R(a->data.u8, a->step, db->data.s16, dy_step, roi, ippMskSize3x3, ippBorderRepl, 0, buffer);
+    }
+    
+    free(buffer);
+}
+ 
+
+void ipp_canny(ccv_dense_matrix_t* a, ccv_dense_matrix_t** b, int type, int size_, double low_thresh, double high_thresh)
+{
+	assert(CCV_GET_CHANNEL(a->type) == CCV_C1);
+	ccv_declare_derived_signature(sig, a->sig != 0, ccv_sign_with_format(64, "ipp_canny(%d,%la,%la)", size_, low_thresh, high_thresh), a->sig, CCV_EOF_SIGN);
+	type = (type == 0) ? CCV_8U | CCV_C1 : CCV_GET_DATA_TYPE(type) | CCV_C1;
+	ccv_dense_matrix_t* db = *b = ccv_dense_matrix_renew(*b, a->rows, a->cols, CCV_C1 | CCV_ALL_DATA_TYPE, type, sig);
+	ccv_object_return_if_cached(, db);
+
+    IppStatus sts;
+    int size, srcStep, dx_step, dy_step, dst_step;
+    int width = a->cols; int height = a->rows;
+    IppiSize roi = {width,height};
+    srcStep = dst_step = width;
+    dx_step = dy_step = 2*width;
+
+	ccv_dense_matrix_t* dx = 0;
+	ipp_sobel(a, &dx, 0, 3, 0);
+	ccv_dense_matrix_t* dy = 0;
+	ipp_sobel(a, &dy, 0, 0, 3);
+
+    ippiCannyGetSize(roi, &size);
+    Ipp8u *buffer = (Ipp8u*) malloc(size);
+    sts = ippiCanny_16s8u_C1R(dx->data.s16, dx_step, dy->data.s16, dy_step, db->data.u8, dst_step, roi, low_thresh, high_thresh, buffer);
+
+    ccv_matrix_free(dx);
+    ccv_matrix_free(dy);
+    free(buffer);
+}
+
 
 /* ccv_swt is only the method to generate stroke width map */
 void ccv_swt(ccv_dense_matrix_t* a, ccv_dense_matrix_t** b, int type, ccv_swt_param_t params)
@@ -51,16 +120,28 @@ void ccv_swt(ccv_dense_matrix_t* a, ccv_dense_matrix_t** b, int type, ccv_swt_pa
 	type = (type == 0) ? CCV_32S | CCV_C1 : CCV_GET_DATA_TYPE(type) | CCV_C1;
 	ccv_dense_matrix_t* db = *b = ccv_dense_matrix_renew(*b, a->rows, a->cols, CCV_C1 | CCV_ALL_DATA_TYPE, type, sig);
 	ccv_object_return_if_cached(, db);
+
+	unsigned int elapsed_time;
+
+	elapsed_time = get_current_time();
 	ccv_dense_matrix_t* cc = 0;
-	ccv_canny(a, &cc, 0, params.size, params.low_thresh, params.high_thresh);
+	ipp_canny(a, &cc, 0, params.size, params.low_thresh, params.high_thresh);
+    //ccv_write(cc, "cc.png", 0, CCV_IO_PNG_FILE, 0);
+    printf("canny %ums\n", get_current_time() - elapsed_time);
+
+	elapsed_time = get_current_time();
 	ccv_dense_matrix_t* c = 0;
 	ccv_close_outline(cc, &c, 0);
 	ccv_matrix_free(cc);
-	ccv_dense_matrix_t* dx = 0;
-	ccv_sobel(a, &dx, 0, params.size, 0);
-	ccv_dense_matrix_t* dy = 0;
-	ccv_sobel(a, &dy, 0, 0, params.size);
+    printf("outline %ums\n", get_current_time() -elapsed_time);
 
+    // sobel precomputed in ipp_canny, so must be 0ms
+	elapsed_time = get_current_time();
+	ccv_dense_matrix_t* dx = 0;
+	ipp_sobel(a, &dx, 0, params.size, 0);
+	ccv_dense_matrix_t* dy = 0;
+	ipp_sobel(a, &dy, 0, 0, params.size);
+    printf("sobel %ums\n", get_current_time() -elapsed_time);
 
 
 	int i, j, k, w;
@@ -70,6 +151,7 @@ void ccv_swt(ccv_dense_matrix_t* a, ccv_dense_matrix_t** b, int type, ccv_swt_pa
 	unsigned char* c_ptr = c->data.u8;
 	unsigned char* dx_ptr = dx->data.u8;
 	unsigned char* dy_ptr = dy->data.u8;
+
 	ccv_zero(db);
 	int dx5[] = {-1, 0, 1, 0, 0};
 	int dy5[] = {0, 0, 0, -1, 1};
@@ -99,6 +181,7 @@ void ccv_swt(ccv_dense_matrix_t* a, ccv_dense_matrix_t** b, int type, ccv_swt_pa
 		y0 += sy; \
 	}
 	int rdx, rdy, flag;
+
 #define ray_emit(xx, xy, yx, yy, _for_get_d, _for_set_b, _for_get_b) \
 	rdx = _for_get_d(dx_ptr, j, 0) * (xx) + _for_get_d(dy_ptr, j, 0) * (xy); \
 	rdy = _for_get_d(dx_ptr, j, 0) * (yx) + _for_get_d(dy_ptr, j, 0) * (yy); \
@@ -111,7 +194,7 @@ void ccv_swt(ccv_dense_matrix_t* a, ccv_dense_matrix_t** b, int type, ccv_swt_pa
 	flag = 0; \
 	kx = x0; \
 	ky = y0; \
-	for (w = 0; w < 70; w++) \
+	for (w = 0; w < MAX_RAY_LENGTH; w++) \
 	{ \
 		ray_increment(); \
 		if (x0 >= a->cols - 1 || x0 < 1 || y0 >= a->rows - 1 || y0 < 1) \
@@ -178,6 +261,7 @@ void ccv_swt(ccv_dense_matrix_t* a, ccv_dense_matrix_t** b, int type, ccv_swt_pa
 		} \
 	}
 #define for_block(_for_get_d, _for_set_b, _for_get_b) \
+	unsigned int elapsed_time = get_current_time();\
 	for (i = 0; i < a->rows; i++) \
 	{ \
 		for (j = 0; j < a->cols; j++) \
@@ -192,6 +276,9 @@ void ccv_swt(ccv_dense_matrix_t* a, ccv_dense_matrix_t** b, int type, ccv_swt_pa
 		dx_ptr += dx->step; \
 		dy_ptr += dy->step; \
 	} \
+	elapsed_time = get_current_time() - elapsed_time;\
+    printf("rays %ums\n", elapsed_time);\
+	elapsed_time = get_current_time();\
 	b_ptr = db->data.u8; \
 	/* compute median width of stroke, from shortest strokes to longest */ \
 	_ccv_swt_stroke_qsort((ccv_swt_stroke_t*)ccv_array_get(strokes, 0), strokes->rnum, 0); \
@@ -219,15 +306,18 @@ void ccv_swt(ccv_dense_matrix_t* a, ccv_dense_matrix_t** b, int type, ccv_swt_pa
 				ray_increment(); \
 			} \
 		} \
-	}
-	//unsigned int elapsed_time = get_current_time();
-	ccv_matrix_getter(dx->type, ccv_matrix_setter_getter, db->type, for_block);
-	//elapsed_time = get_current_time() - elapsed_time;
-	//printf("swt time %dms\n", elapsed_time);
+	}\
+	elapsed_time = get_current_time() - elapsed_time;\
+    printf("qsort %d ms\n", elapsed_time);\
+
+    // sobel output really is CCV_16S
+	int type2 = CCV_16S | CCV_C1;
+	ccv_matrix_getter(type2, ccv_matrix_setter_getter, db->type, for_block);
 #undef for_block
 #undef ray_emit
 #undef ray_reset
 #undef ray_increment
+    //ccv_write(dx, "dx.png", 0, CCV_IO_PNG_FILE, 0);
 	ccv_array_free(strokes);
 	ccv_matrix_free(c);
 	ccv_matrix_free(dx);
@@ -305,8 +395,19 @@ static ccv_array_t* _ccv_swt_connected_letters(ccv_dense_matrix_t* a, ccv_dense_
 	for (i = 0; i < contours->rnum; i++)
 	{
 		ccv_contour_t* contour = *(ccv_contour_t**)ccv_array_get(contours, i);
+ //       printf("%d %d %d %d\n", contour->rect.x, contour->rect.y, contour->rect.width, contour->rect.height);
 		assert(contour->rect.height <= params.max_height && contour->rect.height >= params.min_height);
 		double ratio = (double)contour->rect.width / (double)contour->rect.height;
+
+        // in russian license plates width cannot be greater than height
+        // TODO parametrize it
+        if (ratio > 1)
+		{
+			ccv_contour_free(contour);
+			continue;
+        }
+
+
 		if (ratio < aspect_ratio_inv || ratio > params.aspect_ratio)
 		{
 			ccv_contour_free(contour);
@@ -813,12 +914,13 @@ ccv_array_t* ccv_swt_detect_words(ccv_dense_matrix_t* a, ccv_swt_param_t params)
 
 ccv_array_t* ccv_swt_detect_textlines2(ccv_dense_matrix_t* a, ccv_swt_param_t params)
 {
+
 	int hr = a->rows * 2 / (params.min_height + params.max_height);
 	int wr = a->cols * 2 / (params.min_height + params.max_height);
 	double scale = pow(2., 1. / (params.interval + 1.));
 	int next = params.interval + 1;
 	int scale_upto = params.scale_invariant ? (int)(log((double)ccv_min(hr, wr)) / log(scale)) : 1;
-	int i, k;
+	int k;
 	//ccv_array_t* all_words = params.scale_invariant ? ccv_array_new(sizeof(ccv_rect_t), 2, 0) : 0;
 	ccv_dense_matrix_t* phx = a;
 	ccv_dense_matrix_t* pyr = a;
@@ -847,13 +949,16 @@ ccv_array_t* ccv_swt_detect_textlines2(ccv_dense_matrix_t* a, ccv_swt_param_t pa
 
 		params.direction = CCV_DARK_TO_BRIGHT;
 		ccv_swt(pyr, &swt, 0, params);
+        //ccv_write(swt, "swt.png", 0, CCV_IO_PNG_FILE, 0);
 
+	    unsigned int elapsed_time = get_current_time();
 		/* perform connected component analysis */
 		ccv_array_t* lettersB = _ccv_swt_connected_letters(pyr, swt, params);
 		ccv_matrix_free(swt);
 		ccv_array_t* textline = _ccv_swt_merge_textline(lettersB, params);
 		swt = 0;
 
+        /*
 		params.direction = CCV_BRIGHT_TO_DARK;
 		ccv_swt(pyr, &swt, 0, params);
 		ccv_array_t* lettersF = _ccv_swt_connected_letters(pyr, swt, params);
@@ -864,18 +969,24 @@ ccv_array_t* ccv_swt_detect_textlines2(ccv_dense_matrix_t* a, ccv_swt_param_t pa
 		for (i = 0; i < textline2->rnum; i++)
 			ccv_array_push(textline, ccv_array_get(textline2, i));
 		ccv_array_free(textline2);
+        */
+
+
 		ccv_array_t* idx = 0;
 
 		int ntl = ccv_array_group(textline, &idx, _ccv_is_same_textline, params.same_word_thresh);
+	    elapsed_time = get_current_time() - elapsed_time;
+        printf("extract %ums\n", elapsed_time);
         
-        for (int j=0; j<ntl; j++) 
+        int j,k;
+        for (j=0; j<ntl; j++) 
         {
             ccv_textline_t *line = (ccv_textline_t*)ccv_array_get(textline, j);
             ccv_textline2_t line2;
             line2.neighbors = line->neighbors;
             line2.rect = line->rect;
             line2.letters = ccv_array_new(sizeof(ccv_letter_t), line->neighbors, 0);
-            for (int k=0; k<line->neighbors; k++) 
+            for (k=0; k<line->neighbors; k++) 
             {
                 ccv_array_push(line2.letters, line->letters[k]);
             }
@@ -883,7 +994,7 @@ ccv_array_t* ccv_swt_detect_textlines2(ccv_dense_matrix_t* a, ccv_swt_param_t pa
         }
 
 		ccv_array_free(lettersB);
-		ccv_array_free(lettersF);
+		//ccv_array_free(lettersF);
         ccv_array_free(textline);
     }
 
@@ -896,7 +1007,8 @@ ccv_array_t* ccv_swt_detect_textlines2(ccv_dense_matrix_t* a, ccv_swt_param_t pa
 
 void ccv_swt_free_textlines2(ccv_array_t *textlines)
 {
-    for (int j=0; j<textlines->rnum; j++) 
+    int j;
+    for (j=0; j<textlines->rnum; j++) 
     {
         ccv_textline2_t *line = (ccv_textline2_t*)ccv_array_get(textlines, j);
         ccv_array_free(line->letters);

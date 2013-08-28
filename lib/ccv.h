@@ -19,6 +19,7 @@
 #endif
 #include <assert.h>
 #include <alloca.h>
+#include <sys/time.h>
 
 #define CCV_PI (3.141592653589793)
 #define ccmalloc malloc
@@ -32,6 +33,7 @@ enum {
 	CCV_32F = 0x0400,
 	CCV_64S = 0x0800,
 	CCV_64F = 0x1000,
+	CCV_16S = 0x1200,
 };
 
 enum {
@@ -47,7 +49,7 @@ static const int _ccv_get_data_type_size[] = { -1, 1, 4, -1, 4, -1, -1, -1, 8, -
 #define CCV_GET_DATA_TYPE_SIZE(x) _ccv_get_data_type_size[CCV_GET_DATA_TYPE(x) >> 8]
 #define CCV_MAX_CHANNEL (0xFF)
 #define CCV_GET_CHANNEL(x) ((x) & 0xFF)
-#define CCV_ALL_DATA_TYPE (CCV_8U | CCV_32S | CCV_32F | CCV_64S | CCV_64F)
+#define CCV_ALL_DATA_TYPE (CCV_8U | CCV_32S | CCV_32F | CCV_64S | CCV_64F | CCV_16S)
 
 enum {
 	CCV_MATRIX_DENSE  = 0x010000,
@@ -69,6 +71,7 @@ typedef union {
 	float* f32;
 	int64_t* i64;
 	double* f64;
+    short* s16;
 } ccv_matrix_cell_t;
 
 typedef struct {
@@ -85,6 +88,7 @@ typedef struct {
 		int64_t i64;
 		double f64;
 		void* p;
+        short* s16;
 	} tag;
 	ccv_matrix_cell_t data;
 } ccv_dense_matrix_t;
@@ -1079,7 +1083,6 @@ ccv_array_t* __attribute__((warn_unused_result)) ccv_icf_detect_objects(ccv_dens
 ccv_icf_multiscale_classifier_cascade_t* __attribute__((warn_unused_result)) ccv_icf_read_classifier_cascade(const char* directory);
 void ccv_icf_write_classifier_cascade(ccv_icf_multiscale_classifier_cascade_t* classifier, const char* directory);
 void ccv_icf_classifier_cascade_free(ccv_icf_multiscale_classifier_cascade_t* classifier);
-
 
 unsigned int get_current_time();
 
