@@ -362,13 +362,13 @@ void ccv_close_outline(ccv_dense_matrix_t* a, ccv_dense_matrix_t** b, int type)
 				_for_set_b(b_ptr, j, _for_get(a_ptr, j, 0), 0); \
 			if (_for_get(a_ptr, j, 0) && _for_get(a_ptr + a->step, j + 1, 0)) \
 			{ \
-				_for_set_b(b_ptr + a->step, j, 1, 0); \
-				_for_set_b(b_ptr, j + 1, 1, 0); \
+				_for_set_b(b_ptr + a->step, j, 255, 0); \
+				_for_set_b(b_ptr, j + 1, 255, 0); \
 			} \
 			if (_for_get(a_ptr + a->step, j, 0) && _for_get(a_ptr, j + 1, 0)) \
 			{ \
-				_for_set_b(b_ptr, j, 1, 0); \
-				_for_set_b(b_ptr + a->step, j + 1, 1, 0); \
+				_for_set_b(b_ptr, j, 255, 0); \
+				_for_set_b(b_ptr + a->step, j + 1, 255, 0); \
 			} \
 		} \
 		if (!_for_get_b(b_ptr, a->cols - 1, 0)) \

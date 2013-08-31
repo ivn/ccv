@@ -262,7 +262,7 @@ int ccv_cache_put(ccv_cache_t* cache, uint64_t sign, void* x, uint32_t size, uin
 				if (dice == udice)
 				{
 					branch->branch.bitmap = on << dice;
-					ccv_cache_index_t* set = (ccv_cache_index_t*)ccmalloc(sizeof(ccv_cache_index_t));
+					ccv_cache_index_t* set = (ccv_cache_index_t*)cccalloc(sizeof(ccv_cache_index_t),1);
 					assert(((uint64_t)set & 0x3) == 0);
 					branch->branch.set = (uint64_t)set;
 					branch->branch.age = age;
@@ -273,7 +273,7 @@ int ccv_cache_put(ccv_cache_t* cache, uint64_t sign, void* x, uint32_t size, uin
 				j <<= 6;
 			}
 			branch->branch.bitmap = (on << dice) | (on << udice);
-			ccv_cache_index_t* set = (ccv_cache_index_t*)ccmalloc(sizeof(ccv_cache_index_t) * 2);
+			ccv_cache_index_t* set = (ccv_cache_index_t*)cccalloc(sizeof(ccv_cache_index_t) * 2,1);
 			assert(((uint64_t)set & 0x3) == 0);
 			branch->branch.set = (uint64_t)set;
 			branch->branch.age = age;

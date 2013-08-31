@@ -127,22 +127,23 @@ void ccv_swt(ccv_dense_matrix_t* a, ccv_dense_matrix_t** b, int type, ccv_swt_pa
 	elapsed_time = get_current_time();
 	ccv_dense_matrix_t* cc = 0;
 	ipp_canny(a, &cc, 0, params.size, params.low_thresh, params.high_thresh);
-    //ccv_write(cc, "cc.png", 0, CCV_IO_PNG_FILE, 0);
-    //printf("canny %ums\n", get_current_time() - elapsed_time);
+    printf("canny %ums\n", get_current_time() - elapsed_time);
+    //ccv_write(cc, "3.png", 0, CCV_IO_PNG_FILE, 0);
 
 	elapsed_time = get_current_time();
 	ccv_dense_matrix_t* c = 0;
 	ccv_close_outline(cc, &c, 0);
 	ccv_matrix_free(cc);
-    //printf("outline %ums\n", get_current_time() -elapsed_time);
-
+    printf("outline %ums\n", get_current_time() -elapsed_time);
+    //ccv_write(c, "4.png", 0, CCV_IO_PNG_FILE, 0);
+    
     // sobel precomputed in ipp_canny, so must be 0ms
 	elapsed_time = get_current_time();
 	ccv_dense_matrix_t* dx = 0;
 	ipp_sobel(a, &dx, 0, params.size, 0);
 	ccv_dense_matrix_t* dy = 0;
 	ipp_sobel(a, &dy, 0, 0, params.size);
-    //printf("sobel %ums\n", get_current_time() -elapsed_time);
+    printf("sobel %ums\n", get_current_time() -elapsed_time);
 
 
 	int i, j, k, w;
@@ -294,7 +295,7 @@ void ccv_swt(ccv_dense_matrix_t* a, ccv_dense_matrix_t** b, int type, ccv_swt_pa
 		dy_ptr += dy->step; \
 	} \
 	elapsed_time = get_current_time() - elapsed_time;\
-    /*printf("rays %ums\n", elapsed_time);*/\
+    printf("rays %ums\n", elapsed_time);\
 	elapsed_time = get_current_time();\
 	b_ptr = db->data.u8; \
 	/* compute median width of stroke, from shortest strokes to longest */ \
@@ -325,7 +326,7 @@ void ccv_swt(ccv_dense_matrix_t* a, ccv_dense_matrix_t** b, int type, ccv_swt_pa
 		} \
 	}\
 	elapsed_time = get_current_time() - elapsed_time;\
-    //printf("median %d ms\n", elapsed_time);\
+    printf("median %d ms\n", elapsed_time);\
 
     // sobel output really is CCV_16S
 	int type2 = CCV_16S | CCV_C1;
@@ -946,6 +947,7 @@ ccv_array_t* ccv_swt_detect_textlines2(ccv_dense_matrix_t* a, ccv_swt_param_t pa
 	ccv_dense_matrix_t* phx = a;
 	ccv_dense_matrix_t* pyr = a;
 	//double cscale = 1.0;
+    //ccv_write(a, "input.png", 0, CCV_IO_PNG_FILE, 0);
 
     ccv_array_t* all_textlines = ccv_array_new(sizeof(ccv_textline2_t), 0, 0);
 
