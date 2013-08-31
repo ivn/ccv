@@ -39,7 +39,8 @@ ccv_dense_matrix_t* ccv_dense_matrix_new(int rows, int cols, int type, void* dat
 	}
 	if (type & CCV_NO_DATA_ALLOC)
 	{
-		mat = (ccv_dense_matrix_t*)ccmalloc(sizeof(ccv_dense_matrix_t));
+		//mat = (ccv_dense_matrix_t*)ccmalloc(sizeof(ccv_dense_matrix_t));
+		mat = (ccv_dense_matrix_t*)cccalloc(sizeof(ccv_dense_matrix_t),1);
 		mat->type = (CCV_GET_CHANNEL(type) | CCV_GET_DATA_TYPE(type) | CCV_MATRIX_DENSE | CCV_NO_DATA_ALLOC) & ~CCV_GARBAGE;
 		mat->data.u8 = data;
 	} else {

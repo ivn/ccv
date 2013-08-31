@@ -2,7 +2,7 @@ include config.mk
 
 #CC += -faddress-sanitizer -fno-omit-frame-pointer
 CFLAGS := -fPIC -O3 -ffast-math -Wall -I${IPPROOT}/include $(CFLAGS)# -fprofile-arcs -ftest-coverage 
-LDFLAGS +=  -lippcv
+LDFLAGS +=  -lippcv -lipps
 
 .PHONY: all clean
 
@@ -15,10 +15,10 @@ clean:
 #	$(AR) rcs $@ $^
 
 
-libccv.so: ccv_cache.o ccv_memory.o 3rdparty/sha1/sha1.o 3rdparty/kissfft/kiss_fft.o 3rdparty/kissfft/kiss_fftnd.o 3rdparty/kissfft/kiss_fftr.o 3rdparty/kissfft/kiss_fftndr.o 3rdparty/kissfft/kissf_fft.o 3rdparty/kissfft/kissf_fftnd.o 3rdparty/kissfft/kissf_fftr.o 3rdparty/kissfft/kissf_fftndr.o 3rdparty/dsfmt/dSFMT.o 3rdparty/sfmt/SFMT.o ccv_io.o ccv_numeric.o ccv_algebra.o ccv_util.o ccv_basic.o ccv_resample.o ccv_transform.o ccv_classic.o ccv_daisy.o ccv_sift.o ccv_bbf.o ccv_mser.o ccv_swt.o ccv_dpm.o ccv_tld.o ccv_ferns.o
+#libccv.so: ccv_cache.o ccv_memory.o 3rdparty/sha1/sha1.o 3rdparty/kissfft/kiss_fft.o 3rdparty/kissfft/kiss_fftnd.o 3rdparty/kissfft/kiss_fftr.o 3rdparty/kissfft/kiss_fftndr.o 3rdparty/kissfft/kissf_fft.o 3rdparty/kissfft/kissf_fftnd.o 3rdparty/kissfft/kissf_fftr.o 3rdparty/kissfft/kissf_fftndr.o 3rdparty/dsfmt/dSFMT.o 3rdparty/sfmt/SFMT.o ccv_io.o ccv_numeric.o ccv_algebra.o ccv_util.o ccv_basic.o ccv_resample.o ccv_transform.o ccv_classic.o ccv_daisy.o ccv_sift.o ccv_bbf.o ccv_mser.o ccv_swt.o ccv_dpm.o ccv_tld.o ccv_ferns.o ccv_icf.o
 
 # this line only for ccv_swt
-#libccv.so: ccv_cache.o ccv_memory.o 3rdparty/sha1/sha1.o ccv_io.o ccv_numeric.o ccv_algebra.o ccv_util.o ccv_basic.o ccv_resample.o ccv_transform.o ccv_classic.o ccv_daisy.o  ccv_swt.o
+libccv.so: ccv_cache.o ccv_memory.o 3rdparty/sha1/sha1.o ccv_io.o ccv_numeric.o ccv_algebra.o ccv_util.o ccv_basic.o ccv_resample.o ccv_transform.o ccv_classic.o ccv_daisy.o  ccv_swt.o
 
 	${CC} -shared -o $@ $^ ${LDFLAGS}
 

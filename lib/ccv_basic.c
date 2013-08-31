@@ -1,6 +1,8 @@
 #include "ccv.h"
 #include "ccv_internal.h"
 
+#include <sys/time.h>
+
 /* sobel filter is fundamental to many other high-level algorithms,
  * here includes 2 special case impl (for 1x3/3x1, 3x3) and one general impl */
 void ccv_sobel(ccv_dense_matrix_t* a, ccv_dense_matrix_t** b, int type, int dx, int dy)

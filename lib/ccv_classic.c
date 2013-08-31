@@ -352,7 +352,7 @@ void ccv_close_outline(ccv_dense_matrix_t* a, ccv_dense_matrix_t** b, int type)
 	int i, j;
 	unsigned char* a_ptr = a->data.u8;
 	unsigned char* b_ptr = db->data.u8;
-	ccv_zero(db);
+	//ccv_zero(db);
 #define for_block(_for_get, _for_set_b, _for_get_b) \
 	for (i = 0; i < a->rows - 1; i++) \
 	{ \
