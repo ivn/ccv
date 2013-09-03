@@ -215,7 +215,7 @@ void ccv_matrix_free(ccv_matrix_t* mat);
 
 uint64_t ccv_cache_generate_signature(const char* msg, int len, uint64_t sig_start, ...);
 
-#define CCV_DEFAULT_CACHE_SIZE (1024 * 1024 * 64)
+#define CCV_DEFAULT_CACHE_SIZE (1024 * 1024 * 1024)
 
 void ccv_drain_cache(void);
 void ccv_disable_cache(void);

@@ -291,6 +291,7 @@ void ccv_disable_cache(void)
 
 void ccv_enable_cache(size_t size)
 {
+    //printf("enablign chache\n");
 	ccv_cache_opt = 1;
 	ccv_cache_init(&ccv_cache, size, 2, ccv_matrix_free_immediately, ccv_array_free_immediately);
 }

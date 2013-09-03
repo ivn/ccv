@@ -13,22 +13,22 @@
 const ccv_swt_param_t ccv_swt_default_params = {
 	.interval = 1,
 	.same_word_thresh = { 0.1, 0.8 },
-	.min_neighbors = 3, //1 original
+	.min_neighbors = 5,
 	.scale_invariant = 0,
-	.size = 3, // 3 original
+	.size = 3,
 	.low_thresh = 50, //124,
-	.high_thresh = 204,
-	.max_height = 100, // 300 original
+	.high_thresh = 100,
+	.max_height = 150, // 300 original
 	.min_height = 8,
 	.min_area = 38,
 	.letter_occlude_thresh = 3,
 	.aspect_ratio = 8,
 	.std_ratio = 0.83,
-	.thickness_ratio = 1.5,
-	.height_ratio = 1.7,
-	.intensity_thresh = 31,
+	.thickness_ratio = 3.0,
+	.height_ratio = 3.0,
+	.intensity_thresh = 41,
 	.distance_ratio = 2.9,
-	.intersect_ratio = 1.3,
+	.intersect_ratio = 1.9,
 	.letter_thresh = 3,
 	.elongate_ratio = 1.9,
 	.breakdown = 0, // 1 original
@@ -127,14 +127,14 @@ void ccv_swt(ccv_dense_matrix_t* a, ccv_dense_matrix_t** b, int type, ccv_swt_pa
 	elapsed_time = get_current_time();
 	ccv_dense_matrix_t* cc = 0;
 	ipp_canny(a, &cc, 0, params.size, params.low_thresh, params.high_thresh);
-    printf("canny %ums\n", get_current_time() - elapsed_time);
-    //ccv_write(cc, "3.png", 0, CCV_IO_PNG_FILE, 0);
+    //printf("canny %ums\n", get_current_time() - elapsed_time);
+    //ccv_write(cc, "canny.png", 0, CCV_IO_PNG_FILE, 0);
 
 	elapsed_time = get_current_time();
 	ccv_dense_matrix_t* c = 0;
 	ccv_close_outline(cc, &c, 0);
 	ccv_matrix_free(cc);
-    printf("outline %ums\n", get_current_time() -elapsed_time);
+    //printf("outline %ums\n", get_current_time() -elapsed_time);
     //ccv_write(c, "4.png", 0, CCV_IO_PNG_FILE, 0);
     
     // sobel precomputed in ipp_canny, so must be 0ms
@@ -143,7 +143,7 @@ void ccv_swt(ccv_dense_matrix_t* a, ccv_dense_matrix_t** b, int type, ccv_swt_pa
 	ipp_sobel(a, &dx, 0, params.size, 0);
 	ccv_dense_matrix_t* dy = 0;
 	ipp_sobel(a, &dy, 0, 0, params.size);
-    printf("sobel %ums\n", get_current_time() -elapsed_time);
+    //printf("sobel %ums\n", get_current_time() -elapsed_time);
 
 
 	int i, j, k, w;
@@ -295,7 +295,7 @@ void ccv_swt(ccv_dense_matrix_t* a, ccv_dense_matrix_t** b, int type, ccv_swt_pa
 		dy_ptr += dy->step; \
 	} \
 	elapsed_time = get_current_time() - elapsed_time;\
-    printf("rays %ums\n", elapsed_time);\
+    /*printf("rays %ums\n", elapsed_time);*/\
 	elapsed_time = get_current_time();\
 	b_ptr = db->data.u8; \
 	/* compute median width of stroke, from shortest strokes to longest */ \
@@ -326,7 +326,7 @@ void ccv_swt(ccv_dense_matrix_t* a, ccv_dense_matrix_t** b, int type, ccv_swt_pa
 		} \
 	}\
 	elapsed_time = get_current_time() - elapsed_time;\
-    printf("median %d ms\n", elapsed_time);\
+    //printf("median %d ms\n", elapsed_time);\
 
     // sobel output really is CCV_16S
 	int type2 = CCV_16S | CCV_C1;
@@ -390,8 +390,16 @@ ccv_array_t* _ccv_swt_connected_component(ccv_dense_matrix_t* a, int ratio, int 
 				}
 				if (contour->rect.height < min_height || contour->rect.height > max_height || contour->size < min_area)
 					ccv_contour_free(contour);
-				else
+				else {
 					ccv_array_push(contours, &contour);
+                    /*printf("\t%d %d %d %d\n", 
+                        contour->rect.x,
+                        contour->rect.y,
+                        contour->rect.width,
+                        contour->rect.height
+                        );
+                    fflush(stdout);*/
+                }
 			}
 		a_ptr += a->cols;
 		m_ptr += a->cols;
@@ -414,13 +422,13 @@ static ccv_array_t* _ccv_swt_connected_letters(ccv_dense_matrix_t* a, ccv_dense_
 	for (i = 0; i < contours->rnum; i++)
 	{
 		ccv_contour_t* contour = *(ccv_contour_t**)ccv_array_get(contours, i);
- //       printf("%d %d %d %d\n", contour->rect.x, contour->rect.y, contour->rect.width, contour->rect.height);
+        //printf("%d %d %d %d\n", contour->rect.x, contour->rect.y, contour->rect.width, contour->rect.height);
 		assert(contour->rect.height <= params.max_height && contour->rect.height >= params.min_height);
 		double ratio = (double)contour->rect.width / (double)contour->rect.height;
 
         // in russian license plates width cannot be greater than height
         // TODO parametrize it
-        if (ratio > 1)
+        if (ratio > 1.5)
 		{
 			ccv_contour_free(contour);
 			continue;
@@ -432,6 +440,7 @@ static ccv_array_t* _ccv_swt_connected_letters(ccv_dense_matrix_t* a, ccv_dense_
 			ccv_contour_free(contour);
 			continue;
 		}
+        //printf("%d %d %d %d\n", contour->rect.x, contour->rect.y, contour->rect.width, contour->rect.height);
 		double xc = (double)contour->m10 / contour->size;
 		double yc = (double)contour->m01 / contour->size;
 		double af = (double)contour->m20 / contour->size - xc * xc;
@@ -444,6 +453,7 @@ static ccv_array_t* _ccv_swt_connected_letters(ccv_dense_matrix_t* a, ccv_dense_
 			ccv_contour_free(contour);
 			continue;
 		}
+        //printf("%d %d %d %d\n", contour->rect.x, contour->rect.y, contour->rect.width, contour->rect.height);
 		double mean = 0;
 		for (j = 0; j < contour->size; j++)
 		{
@@ -615,25 +625,51 @@ static ccv_array_t* _ccv_swt_merge_textline(ccv_array_t* letters, ccv_swt_param_
 	for (i = 0; i < letters->rnum - 1; i++)
 	{
 		ccv_letter_t* li = (ccv_letter_t*)ccv_array_get(letters, i);
+        //printf("%d %d %d %d\n", li->rect.x, li->rect.y, li->rect.width, li->rect.height);
 		for (j = i + 1; j < letters->rnum; j++)
 		{
 			ccv_letter_t* lj = (ccv_letter_t*)ccv_array_get(letters, j);
 			double ratio = (double)li->thickness / lj->thickness;
-			if (ratio > params.thickness_ratio || ratio < thickness_ratio_inv)
+			if (ratio > params.thickness_ratio || ratio < thickness_ratio_inv) {
+                    //printf("fuck\n");
+                //printf("%f > %f || %f < %f\n", ratio, params.thickness_ratio, ratio, thickness_ratio_inv);
 				continue;
+            }
+
 			ratio = (double)li->rect.height / lj->rect.height;
-			if (ratio > params.height_ratio || ratio < height_ratio_inv)
+			if (ratio > params.height_ratio || ratio < height_ratio_inv) {
+                //if ((i==50) && (j == 49 || j == 52)) {printf("fuck1\n");}
 				continue;
-			if (abs(li->intensity - lj->intensity) > params.intensity_thresh)
+            }
+			if (abs(li->intensity - lj->intensity) > params.intensity_thresh) {
+                //if ((i==50) && (j == 49 || j == 52)) {printf("fuck2\n");}
 				continue;
+            }    
 			int dx = li->rect.x - lj->rect.x + (li->rect.width - lj->rect.width) / 2;
 			int dy = li->rect.y - lj->rect.y + (li->rect.height - lj->rect.height) / 2;
-			if (abs(dx) > params.distance_ratio * ccv_max(li->rect.width, lj->rect.width))
+			if (abs(dx) > params.distance_ratio * ccv_max(li->rect.width, lj->rect.width)) {
+                //if ((i==50) && (j == 49 || j == 52)) {printf("fuck3\n");}
 				continue;
-			int oy = ccv_min(li->rect.y + li->rect.height, lj->rect.y + lj->rect.height) - ccv_max(li->rect.y, lj->rect.y);
-			if (oy * params.intersect_ratio < ccv_min(li->rect.height, lj->rect.height))
+            }
+			
+            // oy = total height of pair
+            int oy = ccv_min(li->rect.y + li->rect.height, lj->rect.y + lj->rect.height) - ccv_max(li->rect.y, lj->rect.y); 
+
+			if (oy * params.intersect_ratio < ccv_min(li->rect.height, lj->rect.height)) {
+                //printf("%f %d\n",
+			    //    oy * params.intersect_ratio,
+                //    ccv_min(li->rect.height, lj->rect.height));
+                //printf("%d %d %d %d\n", li->rect.x, li->rect.y, li->rect.width, li->rect.height);
+                //printf("%d %d %d %d\n", lj->rect.x, lj->rect.y, lj->rect.width, lj->rect.height);
 				continue;
+            }    
+            //printf("%d %d %d %d\n", li->rect.x, li->rect.y, li->rect.width, li->rect.height);
+            //printf("%d %d %d %d\n", lj->rect.x, lj->rect.y, lj->rect.width, lj->rect.height);
+            //printf("%d %d %d %d\n", li->rect.x, li->rect.y, li->rect.width, li->rect.height);
+            //printf("%d %d %d %d\n", lj->rect.x, lj->rect.y, lj->rect.width, lj->rect.height);
 			ccv_letter_pair_t pair = { .left = li, .right = lj, .dx = dx, .dy = dy };
+            //printf("%d %d %d %d\n", li->rect.x, li->rect.y, li->rect.width, li->rect.height);
+            //printf("%d %d %d %d\n", lj->rect.x, lj->rect.y, lj->rect.width, lj->rect.height);
 			ccv_array_push(pairs, &pair);
 		}
 	}
@@ -647,15 +683,20 @@ static ccv_array_t* _ccv_swt_merge_textline(ccv_array_t* letters, ccv_swt_param_
 		j = *(int*)ccv_array_get(idx, i);
 		_ccv_swt_add_letter(chain + j,((ccv_letter_pair_t*)ccv_array_get(pairs, i))->left);
 		_ccv_swt_add_letter(chain + j, ((ccv_letter_pair_t*)ccv_array_get(pairs, i))->right);
+		//ccv_letter_t* li = ((ccv_letter_pair_t*)ccv_array_get(pairs, i))->left;
+		//ccv_letter_t* lj = ((ccv_letter_pair_t*)ccv_array_get(pairs, i))->right;
 	}
 	ccv_array_free(idx);
 	ccv_array_free(pairs);
 	ccv_array_t* regions = ccv_array_new(sizeof(ccv_textline_t), 5, 0);
 	for (i = 0; i < nchains; i++)
-		if (chain[i].neighbors >= params.letter_thresh && chain[i].rect.width > chain[i].rect.height * params.elongate_ratio)
+		if (chain[i].neighbors >= params.letter_thresh && chain[i].rect.width > chain[i].rect.height * params.elongate_ratio) {
+            //printf("%d %d %d %d\n", chain[i].rect.x, chain[i].rect.y, chain[i].rect.width, chain[i].rect.height);
 			ccv_array_push(regions, chain + i);
-		else if (chain[i].neighbors > 0)
+		} else if (chain[i].neighbors > 0) {
+			//ccv_array_push(regions, chain + i);
 			ccfree(chain[i].letters);
+        }
 	ccfree(chain);
 	return regions;
 }
@@ -663,60 +704,6 @@ static ccv_array_t* _ccv_swt_merge_textline(ccv_array_t* letters, ccv_swt_param_
 #define less_than(a, b, aux) ((a)->center.x < (b)->center.x)
 CCV_IMPLEMENT_QSORT(_ccv_sort_letters, ccv_letter_t*, less_than)
 #undef less_than
-
-static ccv_array_t* _ccv_swt_break_words(ccv_array_t* textline, ccv_swt_param_t params)
-{
-	int i, j, n = 0;
-	for (i = 0; i < textline->rnum; i++)
-	{
-		ccv_textline_t* t = (ccv_textline_t*)ccv_array_get(textline, i);
-		if (t->neighbors - 1 > n)
-			n = t->neighbors - 1;
-	}
-	int* buffer = (int*)alloca(n * sizeof(int));
-	ccv_array_t* words = ccv_array_new(sizeof(ccv_rect_t), textline->rnum, 0);
-	for (i = 0; i < textline->rnum; i++)
-	{
-		ccv_textline_t* t = (ccv_textline_t*)ccv_array_get(textline, i);
-		_ccv_sort_letters(t->letters, t->neighbors, 0);
-		int range = 0;
-		double mean = 0;
-		for (j = 0; j < t->neighbors - 1; j++)
-		{
-			buffer[j] = ccv_max(0, t->letters[j + 1]->rect.x - (t->letters[j]->rect.x + t->letters[j]->rect.width));
-			if (buffer[j] >= range)
-				range = buffer[j] + 1;
-			mean += buffer[j];
-		}
-		ccv_dense_matrix_t otsu = ccv_dense_matrix(1, t->neighbors - 1, CCV_32S | CCV_C1, buffer, 0);
-		double var;
-		int threshold = ccv_otsu(&otsu, &var, range);
-		mean = mean / (t->neighbors - 1);
-		if (sqrt(var) > mean * params.breakdown_ratio)
-		{
-			ccv_textline_t nt = { .neighbors = 0, .letters = 0 };
-			_ccv_swt_add_letter(&nt, t->letters[0]);
-			for (j = 0; j < t->neighbors - 1; j++)
-			{
-				if (buffer[j] > threshold)
-				{
-					ccv_array_push(words, &nt.rect);
-					if (nt.letters)
-						ccfree(nt.letters);
-					nt.letters = 0;
-					nt.neighbors = 0;
-				}
-				_ccv_swt_add_letter(&nt, t->letters[j + 1]);
-			}
-			ccv_array_push(words, &nt.rect);
-			if (nt.letters)
-				ccfree(nt.letters);
-		} else {
-			ccv_array_push(words, &(t->rect));
-		}
-	}
-	return words;
-}
 
 static int _ccv_is_same_textline(const void* a, const void* b, void* data)
 {
@@ -730,207 +717,6 @@ static int _ccv_is_same_textline(const void* a, const void* b, void* data)
 			width * height > thresh[0] * ccv_max(t1->rect.width * t1->rect.height, t2->rect.width * t2->rect.height) &&
 			width * height > thresh[1] * ccv_min(t1->rect.width * t1->rect.height, t2->rect.width * t2->rect.height));
 }
-
-ccv_array_t* ccv_swt_detect_words(ccv_dense_matrix_t* a, ccv_swt_param_t params)
-{
-	int hr = a->rows * 2 / (params.min_height + params.max_height);
-	int wr = a->cols * 2 / (params.min_height + params.max_height);
-	double scale = pow(2., 1. / (params.interval + 1.));
-	int next = params.interval + 1;
-	int scale_upto = params.scale_invariant ? (int)(log((double)ccv_min(hr, wr)) / log(scale)) : 1;
-	int i, k;
-	ccv_array_t* all_words = params.scale_invariant ? ccv_array_new(sizeof(ccv_rect_t), 2, 0) : 0;
-	ccv_dense_matrix_t* phx = a;
-	ccv_dense_matrix_t* pyr = a;
-	double cscale = 1.0;
-	for (k = 0; k < scale_upto; k++)
-	{
-		// create down-sampled image on-demand because swt itself is very memory intensive
-		if (k % next)
-		{
-			pyr = 0;
-			int j = k % next;
-			ccv_resample(phx, &pyr, 0, (int)(phx->rows / pow(scale, j)), (int)(phx->cols / pow(scale, j)), CCV_INTER_AREA);
-		} else if (k > 0) {
-			ccv_dense_matrix_t* pha = phx;
-			phx = 0;
-			ccv_sample_down(pha, &phx, 0, 0, 0);
-			if (pha != a)
-				ccv_matrix_free(pha);
-			pyr = phx;
-		}
-
-		ccv_dense_matrix_t* swt = 0;
-
-		params.direction = CCV_DARK_TO_BRIGHT;
-		ccv_swt(pyr, &swt, 0, params);
-
-		/* perform connected component analysis */
-		ccv_array_t* lettersB = _ccv_swt_connected_letters(pyr, swt, params);
-		ccv_matrix_free(swt);
-		ccv_array_t* textline = _ccv_swt_merge_textline(lettersB, params);
-		swt = 0;
-
-		params.direction = CCV_BRIGHT_TO_DARK;
-		ccv_swt(pyr, &swt, 0, params);
-		ccv_array_t* lettersF = _ccv_swt_connected_letters(pyr, swt, params);
-		ccv_matrix_free(swt);
-		if (pyr != phx)
-			ccv_matrix_free(pyr);
-		ccv_array_t* textline2 = _ccv_swt_merge_textline(lettersF, params);
-		for (i = 0; i < textline2->rnum; i++)
-			ccv_array_push(textline, ccv_array_get(textline2, i));
-		ccv_array_free(textline2);
-		ccv_array_t* idx = 0;
-
-		int ntl = ccv_array_group(textline, &idx, _ccv_is_same_textline, params.same_word_thresh);
-		ccv_array_t* words;
-
-		if (params.breakdown)
-		{
-			textline2 = ccv_array_new(sizeof(ccv_textline_t), ntl, 0);
-			ccv_array_zero(textline2);
-			textline2->rnum = ntl;
-			for (i = 0; i < textline->rnum; i++)
-			{
-				ccv_textline_t* r = (ccv_textline_t*)ccv_array_get(textline, i);
-				int k = *(int*)ccv_array_get(idx, i);
-				ccv_textline_t* r2 = (ccv_textline_t*)ccv_array_get(textline2, k);
-				if (r2->rect.width < r->rect.width)
-				{
-					if (r2->letters)
-						ccfree(r2->letters);
-					*r2 = *r;
-				} else if (r->letters) {
-					ccfree(r->letters);
-				}
-			}
-			ccv_array_free(idx);
-			ccv_array_free(textline);
-			words = _ccv_swt_break_words(textline2, params);
-			for (i = 0; i < textline2->rnum; i++) {
-
-                /*
-                ccv_textline_t *line = (ccv_textline_t*)ccv_array_get(textline2, i);
-                printf("neighbors: %d\n", line->neighbors);
-                for (int j=0; j<line->neighbors; j++) {
-                    printf("%d %d %d %d\n", 
-                        line->letters[j]->rect.x,
-                        line->letters[j]->rect.y,
-                        line->letters[j]->rect.width,
-                        line->letters[j]->rect.height
-                        );
-                }
-                */
-				ccfree( ((ccv_textline_t*)ccv_array_get(textline2, i))->letters );
-
-
-            }
-			ccv_array_free(textline2);
-			ccv_array_free(lettersB);
-			ccv_array_free(lettersF);
-		} else {
-
-			ccv_array_free(lettersB);
-			ccv_array_free(lettersF);
-			words = ccv_array_new(sizeof(ccv_rect_t), ntl, 0);
-			ccv_array_zero(words);
-			words->rnum = ntl;
-
-			for (i = 0; i < textline->rnum; i++)
-			{
-				ccv_textline_t* r = (ccv_textline_t*)ccv_array_get(textline, i);
-                /*
-                printf("neighbors: %d\n", r->neighbors);
-                for (int j=0; j<r->neighbors; j++) {
-                    printf("%d %d %d %d\n", 
-                        r->letters[j]->rect.x,
-                        r->letters[j]->rect.y,
-                        r->letters[j]->rect.width,
-                        r->letters[j]->rect.height
-                        );
-                }
-                */
-				if (r->letters)
-					ccfree(r->letters);
-                
-
-				int k = *(int*)ccv_array_get(idx, i);
-				ccv_rect_t* r2 = (ccv_rect_t*)ccv_array_get(words, k);
-				if (r2->width * r2->height < r->rect.width * r->rect.height)
-					*r2 = r->rect;
-			}
-			ccv_array_free(idx);
-			ccv_array_free(textline);
-		}
-
-
-
-		if (params.scale_invariant)
-		{
-			for (i = 0; i < words->rnum; i++)
-			{
-				ccv_rect_t* rect = (ccv_rect_t*)ccv_array_get(words, i);
-				rect->x = (int)(rect->x * cscale + 0.5);
-				rect->y = (int)(rect->y * cscale + 0.5);
-				rect->width = (int)(rect->width * cscale + 0.5);
-				rect->height = (int)(rect->height * cscale + 0.5);
-				ccv_array_push(all_words, rect);
-			}
-			ccv_array_free(words);
-			cscale *= scale;
-		} else
-			all_words = words;
-	}
-
-
-	if (params.scale_invariant && params.min_neighbors)
-	{
-		// de-dup logic, similar to what BBF / DPM have
-		ccv_array_t* idx = 0;
-		int ntl = ccv_array_group(all_words, &idx, _ccv_is_same_textline, params.same_word_thresh);
-		ccv_array_t* new_words = ccv_array_new(sizeof(ccv_comp_t), ntl, 0);
-		ccv_array_zero(new_words);
-		new_words->rnum = ntl;
-		for (i = 0; i < all_words->rnum; i++)
-		{
-			ccv_rect_t* r1 = (ccv_rect_t*)ccv_array_get(all_words, i);
-			int k = *(int*)ccv_array_get(idx, i);
-			ccv_comp_t* r2 = (ccv_comp_t*)ccv_array_get(new_words, k);
-			if (r2->neighbors)
-			{
-				++r2->neighbors;
-				// simply pick the biggest
-				if (r1->width * r1->height > r2->rect.width * r2->rect.height)
-					r2->rect = *r1;
-			} else {
-				r2->rect = *r1;
-				r2->neighbors = 1;
-			}
-		}
-		ccv_array_free(idx);
-		ccv_array_free(all_words);
-		if (params.min_neighbors > 1)
-		{
-			// filter out min_neighbors
-			all_words = ccv_array_new(sizeof(ccv_comp_t), new_words->rnum / 2, 0);
-			for (i = 0; i < new_words->rnum; i++)
-			{
-				ccv_comp_t* comp = (ccv_comp_t*)ccv_array_get(new_words, i);
-				int n = comp->neighbors;
-				if (n >= params.min_neighbors)
-					ccv_array_push(all_words, comp);
-			}
-			ccv_array_free(new_words);
-		} else
-			// just copy the pointer for min_neighbors == 1
-			all_words = new_words;
-	}
-	if (phx != a)
-		ccv_matrix_free(phx);
-	return all_words;
-}
-
 
 
 
@@ -999,12 +785,16 @@ ccv_array_t* ccv_swt_detect_textlines2(ccv_dense_matrix_t* a, ccv_swt_param_t pa
 
 		int ntl = ccv_array_group(textline, &idx, _ccv_is_same_textline, params.same_word_thresh);
 	    elapsed_time = get_current_time() - elapsed_time;
-        //printf("extract %ums\n", elapsed_time);
+        printf("extract %ums, ntl=%d, rnum=%d\n", elapsed_time, ntl, textline->rnum);
         
         int j,k;
-        for (j=0; j<ntl; j++) 
+        //for (j=0; j<ntl; j++) 
+        for (j=0; j<textline->rnum; j++) 
         {
             ccv_textline_t *line = (ccv_textline_t*)ccv_array_get(textline, j);
+            if (line->neighbors < params.min_neighbors)
+                continue;
+
             ccv_textline2_t line2;
             line2.neighbors = line->neighbors;
             line2.rect = line->rect;
