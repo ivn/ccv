@@ -1,6 +1,10 @@
 #include "ccv.h"
 #include "ccv_internal.h"
 
+#include "ipp.h"
+#include "ipps.h"
+
+
 void ccv_decimal_slice(ccv_dense_matrix_t* a, ccv_dense_matrix_t** b, int type, float y, float x, int rows, int cols)
 {
 	ccv_declare_derived_signature(sig, a->sig != 0, ccv_sign_with_format(64, "ccv_decimal_slice(%a,%a,%d,%d)", y, x, rows, cols), a->sig, CCV_EOF_SIGN);
@@ -171,4 +175,73 @@ void ccv_perspective_transform(ccv_dense_matrix_t* a, ccv_dense_matrix_t** b, in
 	}
 	ccv_matrix_setter(db->type, ccv_matrix_getter, a->type, for_block);
 #undef for_block
+}
+
+
+Ipp8u *ipp_resize_buf = 0;
+
+void ipp_resize(ccv_dense_matrix_t* a, ccv_dense_matrix_t** b)
+{
+	assert(CCV_GET_CHANNEL(a->type) == CCV_C1);
+	ccv_declare_derived_signature(sig, a->sig != 0, ccv_sign_with_format(64, "ipp_resize()"), a->sig, CCV_EOF_SIGN);
+    int type = 0;
+	type = (type == 0) ? CCV_8U | CCV_C1 : CCV_GET_DATA_TYPE(type) | CCV_C1;
+	ccv_dense_matrix_t* db = *b = ccv_dense_matrix_renew(*b, a->rows*2, a->cols*2, CCV_C1 | CCV_ALL_DATA_TYPE, type, sig);
+	ccv_object_return_if_cached(, db);
+
+    IppStatus status;
+    int size, src_step, dx_step, dy_step, dst_step;
+    int width = a->cols; int height = a->rows;
+    IppiSize srcSize = {width,height};
+    IppiSize dstSize = {width*2,height*2};
+    src_step = width;
+    dst_step = width*2;
+
+    IppiRect srect = {0,0,width,height};
+    IppiRect drect = {0,0,width*2,height*2};
+
+    if (!ipp_resize_buf) {
+    int bufsize, nt;
+        ippiResizeGetBufSize( srect, drect, 1, IPPI_INTER_LINEAR, &bufsize );
+        //Ipp8u *buf;
+        ipp_resize_buf = ippsMalloc_8u( bufsize );
+    }
+
+	unsigned int elapsed_time = get_current_time();
+    status = ippiResizeSqrPixel_8u_C1R(
+        a->data.u8, srcSize, src_step, srect,
+        db->data.u8, dst_step, drect,
+        2,2,0,0,IPPI_INTER_LINEAR,ipp_resize_buf); 
+    printf("internal resize %ums\n", get_current_time() -elapsed_time);
+
+}
+
+
+void ipp_gauss_filter(ccv_dense_matrix_t* a, ccv_dense_matrix_t** b)
+{
+	assert(CCV_GET_CHANNEL(a->type) == CCV_C1);
+	ccv_declare_derived_signature(sig, a->sig != 0, ccv_sign_with_format(64, "ipp_gausss_filter()"), a->sig, CCV_EOF_SIGN);
+    int type = 0;
+	type = (type == 0) ? CCV_8U | CCV_C1 : CCV_GET_DATA_TYPE(type) | CCV_C1;
+	ccv_dense_matrix_t* db = *b = ccv_dense_matrix_renew(*b, a->rows, a->cols, CCV_C1 | CCV_ALL_DATA_TYPE, type, sig);
+	ccv_object_return_if_cached(, db);
+
+    IppStatus status;
+    int size, src_step, dx_step, dy_step, dst_step;
+    int width = a->cols; int height = a->rows;
+    IppiSize srcSize = {width,height};
+    IppiSize dstSize = {width,height};
+    src_step = width;
+    dst_step = width;
+
+    IppiRect srect = {0,0,width,height};
+    IppiRect drect = {0,0,width,height};
+
+	unsigned int elapsed_time = get_current_time();
+    status = ippiFilterGauss_8u_C1R(
+        a->data.u8, src_step,
+        db->data.u8, dst_step,
+        dstSize,ippMskSize5x5);
+    printf("internal highpass_filter %ums\n", get_current_time() -elapsed_time);
+
 }

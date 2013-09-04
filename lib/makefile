@@ -2,7 +2,7 @@ include config.mk
 
 #CC += -faddress-sanitizer -fno-omit-frame-pointer
 CFLAGS := -fPIC -O3 -ffast-math -Wall -I${IPPROOT}/include $(CFLAGS)# -fprofile-arcs -ftest-coverage 
-LDFLAGS +=  -lippcv -lipps
+LDFLAGS +=  -lippcv -lipps -lippi
 
 .PHONY: all clean
 

@@ -1084,6 +1084,10 @@ ccv_icf_multiscale_classifier_cascade_t* __attribute__((warn_unused_result)) ccv
 void ccv_icf_write_classifier_cascade(ccv_icf_multiscale_classifier_cascade_t* classifier, const char* directory);
 void ccv_icf_classifier_cascade_free(ccv_icf_multiscale_classifier_cascade_t* classifier);
 
+
+// some utility functions
 unsigned int get_current_time();
+void ipp_resize(ccv_dense_matrix_t* a, ccv_dense_matrix_t** b);
+void ipp_gauss_filter(ccv_dense_matrix_t* a, ccv_dense_matrix_t** b);
 
 #endif

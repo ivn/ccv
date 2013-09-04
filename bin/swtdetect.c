@@ -7,14 +7,19 @@
 
 int main(int argc, char** argv)
 {
-	ccv_enable_cache(1024*1024*1024);
-	//ccv_enable_default_cache();
+	//ccv_enable_cache(1024*1024*1024);
+	ccv_enable_default_cache();
 	ccv_dense_matrix_t* image = 0;
+	ccv_dense_matrix_t* image2 = 0;
+	ccv_dense_matrix_t* image3 = 0;
 	ccv_read(argv[1], &image, CCV_IO_GRAY | CCV_IO_ANY_FILE);
 	if (image != 0)
 	{
+        ipp_resize(image, &image2);
+        ipp_gauss_filter(image2, &image3);
+        ccv_write(image3, "resized.png", 0, CCV_IO_PNG_FILE, 0);
 		unsigned int elapsed_time = get_current_time();
-		ccv_array_t* textlines = ccv_swt_detect_textlines2(image, ccv_swt_default_params);
+		ccv_array_t* textlines = ccv_swt_detect_textlines2(image2, ccv_swt_default_params);
 		elapsed_time = get_current_time() - elapsed_time;
 		if (textlines)
 		{
@@ -50,6 +55,8 @@ int main(int argc, char** argv)
 			ccv_swt_free_textlines2(textlines);
 		}
 		ccv_matrix_free(image);
+		ccv_matrix_free(image2);
+		ccv_matrix_free(image3);
 	} /*else {
 		FILE* r = fopen(argv[1], "rt");
 		if (argc == 3)

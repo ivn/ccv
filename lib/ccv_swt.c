@@ -16,9 +16,9 @@ const ccv_swt_param_t ccv_swt_default_params = {
 	.min_neighbors = 5,
 	.scale_invariant = 0,
 	.size = 3,
-	.low_thresh = 50, //124,
-	.high_thresh = 100,
-	.max_height = 150, // 300 original
+	.low_thresh = 0, //124,
+	.high_thresh = 70,
+	.max_height = 200, // 300 original
 	.min_height = 8,
 	.min_area = 38,
 	.letter_occlude_thresh = 3,
@@ -49,6 +49,7 @@ typedef struct {
 static CCV_IMPLEMENT_QSORT(_ccv_swt_stroke_qsort, ccv_swt_stroke_t, less_than)
 #undef less_than
 
+Ipp8u *ipp_sobel_buffer = 0;
 // hardcoded 3x3 mask
 void ipp_sobel(ccv_dense_matrix_t* a, ccv_dense_matrix_t** b, int type, int dx, int dy)
 {
@@ -67,21 +68,26 @@ void ipp_sobel(ccv_dense_matrix_t* a, ccv_dense_matrix_t** b, int type, int dx, 
     dx_step = dy_step = 2*width;
     db->step = dx_step;
 
-    sts = ippiFilterSobelNegVertGetBufferSize_8u16s_C1R(roi, ippMskSize3x3, &size);
-    sts = ippiFilterSobelHorizGetBufferSize_8u16s_C1R(roi, ippMskSize3x3, &size1); 
-    if (size1 > size) size = size1;
-    Ipp8u* buffer = (Ipp8u*) malloc(size);
-
-    if (dx) {
-        sts = ippiFilterSobelNegVertBorder_8u16s_C1R (a->data.u8, a->step, db->data.s16, dx_step, roi, ippMskSize3x3, ippBorderRepl, 0, buffer);
-    } else if (dy) {
-        sts = ippiFilterSobelHorizBorder_8u16s_C1R(a->data.u8, a->step, db->data.s16, dy_step, roi, ippMskSize3x3, ippBorderRepl, 0, buffer);
+    if (!ipp_sobel_buffer) {
+        sts = ippiFilterSobelNegVertGetBufferSize_8u16s_C1R(roi, ippMskSize3x3, &size);
+        sts = ippiFilterSobelHorizGetBufferSize_8u16s_C1R(roi, ippMskSize3x3, &size1); 
+        if (size1 > size) size = size1;
+        ipp_sobel_buffer = (Ipp8u*) malloc(size);
     }
+
+	unsigned int elapsed_time = get_current_time();
+    if (dx) {
+        sts = ippiFilterSobelNegVertBorder_8u16s_C1R (a->data.u8, a->step, db->data.s16, dx_step, roi, ippMskSize3x3, ippBorderRepl, 0, ipp_sobel_buffer);
+    } else if (dy) {
+        sts = ippiFilterSobelHorizBorder_8u16s_C1R(a->data.u8, a->step, db->data.s16, dy_step, roi, ippMskSize3x3, ippBorderRepl, 0, ipp_sobel_buffer);
+    }
+    printf("internal sobel %ums\n", get_current_time() -elapsed_time);
     
-    free(buffer);
+ //   free(buffer);
 }
  
 
+Ipp8u *ipp_canny_buffer = 0;
 void ipp_canny(ccv_dense_matrix_t* a, ccv_dense_matrix_t** b, int type, int size_, double low_thresh, double high_thresh)
 {
 	assert(CCV_GET_CHANNEL(a->type) == CCV_C1);
@@ -102,14 +108,23 @@ void ipp_canny(ccv_dense_matrix_t* a, ccv_dense_matrix_t** b, int type, int size
 	ccv_dense_matrix_t* dy = 0;
 	ipp_sobel(a, &dy, 0, 0, 3);
 
-    ippiCannyGetSize(roi, &size);
-    Ipp8u *buffer = (Ipp8u*) malloc(size);
-    sts = ippiCanny_16s8u_C1R(dx->data.s16, dx_step, dy->data.s16, dy_step, db->data.u8, dst_step, roi, low_thresh, high_thresh, buffer);
+    if (!ipp_canny_buffer) {
+        ippiCannyGetSize(roi, &size);
+        ipp_canny_buffer = (Ipp8u*) ippsMalloc_8u(size);
+    }
+
+	unsigned int elapsed_time = get_current_time();
+    sts = ippiCanny_16s8u_C1R(dx->data.s16, dx_step, dy->data.s16, dy_step, db->data.u8, dst_step, roi, low_thresh, high_thresh, ipp_canny_buffer);
+    printf("internal canny %ums\n", get_current_time() -elapsed_time);
 
     ccv_matrix_free(dx);
     ccv_matrix_free(dy);
-    free(buffer);
+    //free(buffer);
 }
+
+
+
+
 
 
 /* ccv_swt is only the method to generate stroke width map */
@@ -127,14 +142,14 @@ void ccv_swt(ccv_dense_matrix_t* a, ccv_dense_matrix_t** b, int type, ccv_swt_pa
 	elapsed_time = get_current_time();
 	ccv_dense_matrix_t* cc = 0;
 	ipp_canny(a, &cc, 0, params.size, params.low_thresh, params.high_thresh);
-    //printf("canny %ums\n", get_current_time() - elapsed_time);
+    printf("canny %ums\n", get_current_time() - elapsed_time);
     //ccv_write(cc, "canny.png", 0, CCV_IO_PNG_FILE, 0);
 
 	elapsed_time = get_current_time();
 	ccv_dense_matrix_t* c = 0;
 	ccv_close_outline(cc, &c, 0);
 	ccv_matrix_free(cc);
-    //printf("outline %ums\n", get_current_time() -elapsed_time);
+    printf("outline %ums\n", get_current_time() -elapsed_time);
     //ccv_write(c, "4.png", 0, CCV_IO_PNG_FILE, 0);
     
     // sobel precomputed in ipp_canny, so must be 0ms
@@ -143,7 +158,7 @@ void ccv_swt(ccv_dense_matrix_t* a, ccv_dense_matrix_t** b, int type, ccv_swt_pa
 	ipp_sobel(a, &dx, 0, params.size, 0);
 	ccv_dense_matrix_t* dy = 0;
 	ipp_sobel(a, &dy, 0, 0, params.size);
-    //printf("sobel %ums\n", get_current_time() -elapsed_time);
+    printf("sobel %ums\n", get_current_time() -elapsed_time);
 
 
 	int i, j, k, w;
@@ -295,7 +310,7 @@ void ccv_swt(ccv_dense_matrix_t* a, ccv_dense_matrix_t** b, int type, ccv_swt_pa
 		dy_ptr += dy->step; \
 	} \
 	elapsed_time = get_current_time() - elapsed_time;\
-    /*printf("rays %ums\n", elapsed_time);*/\
+    printf("rays %ums\n", elapsed_time);\
 	elapsed_time = get_current_time();\
 	b_ptr = db->data.u8; \
 	/* compute median width of stroke, from shortest strokes to longest */ \
@@ -428,7 +443,7 @@ static ccv_array_t* _ccv_swt_connected_letters(ccv_dense_matrix_t* a, ccv_dense_
 
         // in russian license plates width cannot be greater than height
         // TODO parametrize it
-        if (ratio > 1.5)
+        if (ratio > 1)
 		{
 			ccv_contour_free(contour);
 			continue;
@@ -556,6 +571,22 @@ typedef struct {
 	int dx;
 	int dy;
 } ccv_letter_pair_t;
+
+
+static float _ccv_occupancy_ratio(ccv_textline_t* textline)
+{
+    int area = textline->rect.width * textline->rect.height;
+    int total_letter_area = 0;
+    for (int j=0; j<textline->neighbors; j++) {
+        ccv_letter_t *letter = textline->letters[j];//(ccv_letter_t*) ccv_array_get((ccv_array_t*)textline->letters, j);
+        int letter_area = letter->rect.width * letter->rect.height;
+        //printf("    %d\n", letter_area);
+        total_letter_area += letter_area;
+    }
+    float ratio = ((float)total_letter_area) / area;
+    //printf("____> %d %d %f\n", area, total_letter_area, ratio);
+    return ratio;
+}
 
 static int _ccv_in_textline(const void* a, const void* b, void* data)
 {
@@ -794,6 +825,11 @@ ccv_array_t* ccv_swt_detect_textlines2(ccv_dense_matrix_t* a, ccv_swt_param_t pa
             ccv_textline_t *line = (ccv_textline_t*)ccv_array_get(textline, j);
             if (line->neighbors < params.min_neighbors)
                 continue;
+
+            //if (_ccv_occupancy_ratio((ccv_textline_t*)line) < 0.3)  
+            //    continue;
+
+            //printf("---> %f\n", _ccv_occupancy_ratio((ccv_textline_t*)line));
 
             ccv_textline2_t line2;
             line2.neighbors = line->neighbors;
